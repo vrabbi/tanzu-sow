@@ -1,0 +1,227 @@
+accelerator:
+  options:
+  - name: buildClusterConfig
+    label: "Build Cluster Settings"
+    dataType: BuildCluster
+  types:
+    - name: Overlays
+      struct:
+      - name: gitopsPrivateCaOverlay
+        inputType: checkbox
+        dataType: boolean
+        defaultValue: true
+        label: GitOps Private CA Trust
+      - name: sourceCommitTracabilityOverlay
+        inputType: checkbox
+        dataType: boolean
+        defaultValue: true
+        label: Source Commit Annotations
+      - name: tbsCommitTagOverlay
+        inputType: checkbox
+        dataType: boolean
+        defaultValue: true
+        label: TBS Source Commit Tag Addition
+    - name: BuildCluster
+      struct:
+        - name: clusterType
+          inputType: select
+          choices:
+            - value: tkgm
+              text: TKGm or TKG 2.x with a Management Cluster
+            - value: tkgs
+              text: TKGs or TKG 2.x with a supervisor
+            - value: eks
+              text: EKS
+            - value: tkgi
+              text: TKGi
+            - value: other
+              text: Other
+          required: true
+        - name: clusterName
+          dataType: string
+          label: Cluster Name
+          required: true
+        - name: supplyChain
+          label: Supply Chain
+          inputType: select
+          defaultValue: "testingScanning"
+          choices:
+          - value: basic
+            text: Basic
+          - value: testing
+            text: Testing
+          - value: testing_scanning
+            text: Testing and Scanning
+        - name: deliveryMethod
+          inputType: select
+          choices:
+            - text: RegOps (Imgpkg)
+              value: regOps
+            - text: GitOps Direct Commit
+              value: direct
+            - text: GitOps PR Flow
+              value: pull_request
+          defaultValue: commit
+          label: Deliverable Methodology
+        - name: enableESO
+          defaultValue: false
+          inputType: checkbox
+          dataType: boolean
+          label: Include External Secrets Operator
+        
+        - name: sourceScanner
+          label: Source Scanner
+          choices:
+            - text: Grype (Default)
+              value: grype
+            - text: Trivy
+              value: trivy
+            - text: Prisma
+              value: prisma
+          defaultValue: grype
+        - name: imageScanner
+          label: Image Scanner
+          choices:
+            - text: Grype (Default)
+              value: grype
+            - text: Trivy
+              value: trivy
+            - text: Prisma
+              value: prisma
+            - text: Carbon Black
+              value: cbc
+            - text: Snyk
+              value: snyk
+          defaultValue: grype
+        - name: enableCosign
+          inputType: checkbox
+          dataType: boolean
+          label: Enable Image Signing With Cosign
+          defaultValue: true
+        - name: customOverlays
+          dataType: Overlays
+          label: Custom Overlays
+
+engine:
+  chain:
+  - merge:
+    - include: [ "**/*" ]
+      exclude: ["README.md","cluster-template.yaml", "values.yaml", "scanner/*", "overlays/*", "additions/*", "readme-snippets/*"]
+    - include: ["cluster-template.yaml"]
+      chain:
+      - type: OpenRewriteRecipe
+        recipe: org.openrewrite.yaml.ChangeKey
+        options:
+          oldKeyPath: '"$.ootb_supply_chain_basic"'
+          newKey: "'ootb_supply_chain_' + #buildClusterConfig['supplyChain']"
+      - type: OpenRewriteRecipe
+        recipe: org.openrewrite.yaml.ChangeValue
+        options:
+          oldKeyPath: '"$.supply_chain"'
+          value: "#buildClusterConfig['supplyChain']"
+      - type: OpenRewriteRecipe
+        recipe: org.openrewrite.yaml.ChangeValue
+        condition: "#buildClusterConfig['deliveryMethod'] != 'regOps'"
+        options:
+          oldKeyPath: '"$.ootb_supply_chain_basic.gitops.pull_request.server_kind"'
+          value: "#gitType"
+      - type: OpenRewriteRecipe
+        recipe: org.openrewrite.yaml.ChangeValue
+        condition: "#buildClusterConfig['deliveryMethod'] != 'regOps'"
+        options:
+          oldKeyPath: '"$.supply_chain"'
+          value: "#buildClusterConfig['supplyChain']"
+    - include: ["scanner/prisma-creds.yaml","scanner/prisma-pkgr.yaml"]
+      condition: "#buildClusterConfig['sourceScanner'] == 'prisma'" 
+    - include: ["scanner/trivy-pkgr.yaml"]
+      condition: "#buildClusterConfig['sourceScanner'] == 'trivy'" 
+    - include: ["scanner/prisma-creds.yaml","scanner/prisma-pkgr.yaml"]
+      condition: "#buildClusterConfig['imageScanner'] == 'prisma'"
+    - include: ["scanner/trivy-pkgr.yaml"]
+      condition: "#buildClusterConfig['imageScanner'] == 'trivy'" 
+    - include: ["scanner/snyk-creds.yaml"]
+      condition: "#buildClusterConfig['imageScanner'] == 'snyk'"
+    - include: ["scanner/cbc-creds.yaml"]
+      condition: "#buildClusterConfig['imageScanner'] == 'cbc'"
+    - include: ["overlays/contour-ipv4-overlay.yaml"]
+      condition: "#buildClusterConfig['clusterType'] == 'tkgi'"
+    - include: ["overlays/tkgi-prisma-remove-labels-overlay.yaml"]
+      condition: "#buildClusterConfig['clusterType'] == 'tkgi' and #buildClusterConfig['sourceScanner'] == 'prisma'"
+    - include: ["overlays/gitops-private-ca-overlay.yaml"]
+      condition: "#buildClusterConfig['customOverlays']['gitopsPrivateCaOverlay']"
+    - include: ["overlays/source-details-annotations-overlays.yaml"]
+      condition: "#buildClusterConfig['customOverlays']['sourceCommitTracabilityOverlay']"
+    - include: ["overlays/tbs-source-commit-tag-addition-overlay.yaml"]
+      condition: "#buildClusterConfig['customOverlays']['tbsCommitTagOverlay']"
+    - include: ["additions/cosign-setup.yaml"]
+      condition: "#buildClusterConfig['enableCosign']"
+    - include: ["additions/eso-pkgi.yaml"]
+      condition: "#buildClusterConfig['enableESO']"
+    - include: ["values.yaml"]
+      chain:
+      - type: OpenRewriteRecipe
+        condition: "#buildClusterConfig['sourceScanner'] != 'prisma' and #buildClusterConfig['imageScanner'] != 'prisma'"
+        recipe: org.openrewrite.yaml.DeleteKey
+        options:
+          keyPath: '"$.security.prisma"'  
+      - type: OpenRewriteRecipe
+        condition: "#buildClusterConfig['imageScanner'] != 'snyk'"
+        recipe: org.openrewrite.yaml.DeleteKey
+        options:
+          keyPath: '"$.security.snyk"'  
+      - type: OpenRewriteRecipe
+        condition: "#buildClusterConfig['imageScanner'] != 'cbc'"
+        recipe: org.openrewrite.yaml.DeleteKey
+        options:
+          keyPath: '"$.security.cbc"'  
+      - type: OpenRewriteRecipe
+        recipe: org.openrewrite.yaml.ChangeValue
+        options:
+          oldKeyPath: '"$.security.sourceScanner"'
+          value: "#buildClusterConfig['sourceScanner']"
+      - type: OpenRewriteRecipe
+        recipe: org.openrewrite.yaml.ChangeValue
+        options:
+          oldKeyPath: '"$.security.imageScanner"'
+          value: "#buildClusterConfig['imageScanner']"
+    - include: ["README.md", "readme-snippets/*.md"]
+      chain:
+      - type: RewritePath
+        condition: "#buildClusterConfig['enableCosign']"
+        regex: 'readme-snippets/0-cosign.md'
+        rewriteTo: "'README.md'"
+      - type: RewritePath
+        regex: 'readme-snippets/1-generate-files.md'
+        rewriteTo: "'README.md'"
+      - type: RewritePath
+        regex: 'readme-snippets/2-relocate-images.md'
+        rewriteTo: "'README.md'"
+      - type: RewritePath
+        regex: 'readme-snippets/3-create-prereq-objects.md'
+        rewriteTo: "'README.md'"
+      - type: RewritePath
+        regex: 'readme-snippets/4-install-tap.md'
+        rewriteTo: "'README.md'"
+      - type: RewritePath
+        condition: "#buildClusterConfig['imageScanner'] == 'snyk'"
+        regex: 'readme-snippets/5-snyk.md'
+        rewriteTo: "'README.md'"
+      - type: RewritePath
+        condition: "#buildClusterConfig['imageScanner'] == 'cbc'"
+        regex: 'readme-snippets/5-cbc.md'
+        rewriteTo: "'README.md'"
+      - type: RewritePath
+        condition: "#buildClusterConfig['sourceScanner'] == 'prisma' or #buildClusterConfig['imageScanner'] == 'prisma'"
+        regex: 'readme-snippets/5-prisma.md'
+        rewriteTo: "'README.md'"
+      - type: RewritePath
+        condition: "#buildClusterConfig['sourceScanner'] == 'trivy' or #buildClusterConfig['imageScanner'] == 'trivy'"
+        regex: 'readme-snippets/5-trivy.md'
+        rewriteTo: "'README.md'"
+      - type: RewritePath
+        condition: "#buildClusterConfig['enableESO']"
+        regex: 'readme-snippets/6-eso.md'
+        rewriteTo: "'README.md'"
+      - type: UniquePath
+        strategy: Append
+      

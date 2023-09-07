@@ -1,0 +1,56 @@
+accelerator:
+  displayName: TAP Project Repo Configuration
+  description: An Accelerator to produce a Git repo with all config needed for a TAP project
+  iconUrl: https://mappslearning.files.wordpress.com/2021/09/tanzulogo.png
+  tags:
+  - terasky
+  - tap
+  - tanzu
+  options:
+    - name: createFullCluster
+      dataType: boolean
+      label: Create Full profile clusters
+      defaultValue: false
+      inputType: checkbox
+    - name: createViewCluster
+      dataType: boolean
+      label: Create View profile clusters
+      defaultValue: false
+      inputType: checkbox
+    - name: createIterateCluster
+      dataType: boolean
+      label: Create Iterate profile clusters
+      defaultValue: false
+      inputType: checkbox
+    - name: createBuildCluster
+      dataType: boolean
+      label: Create Build profile clusters
+      defaultValue: false
+      inputType: checkbox
+    - name: createRunCluster
+      dataType: boolean
+      label: Create Run profile clusters
+      defaultValue: false
+      inputType: checkbox
+  imports:
+  - name: full-cluster
+    
+  #- name: view-cluster
+  #- name: iterate-cluster
+  - name: build-cluster
+  #- name: run-cluster
+  - name: git-provider
+engine:
+  chain:
+  - type: InvokeFragment
+    reference: full-cluster
+    condition: '#createFullCluster'
+  - type: RewritePath
+    rewriteTo: "'full-cluster/' + #g0" 
+  - type: InvokeFragment
+    reference: build-cluster
+    condition: '#createBuildCluster'
+  - type: RewritePath
+    rewriteTo: "'build-cluster/' + #g0" 
+  - type: InvokeFragment
+    reference: git-provider

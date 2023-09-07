@@ -1,0 +1,344 @@
+accelerator:
+  options:
+  - name: fullClusterConfig
+    label: "Full Cluster Settings"
+    dataType: FullCluster
+  types:
+    - name: Overlays
+      struct:
+      - name: techdocsOverlay
+        inputType: checkbox
+        dataType: boolean
+        defaultValue: true
+        label: Techdocs Auto Rendering
+      - name: multiRegistryOverlay
+        inputType: checkbox
+        dataType: boolean
+        defaultValue: false
+        label: Multi Registry Support
+      - name: gitopsPrivateCaOverlay
+        inputType: checkbox
+        dataType: boolean
+        defaultValue: true
+        label: GitOps Private CA Trust
+      - name: sourceCommitTracabilityOverlay
+        inputType: checkbox
+        dataType: boolean
+        defaultValue: true
+        label: Source Commit Annotations
+      - name: tbsCommitTagOverlay
+        inputType: checkbox
+        dataType: boolean
+        defaultValue: true
+        label: TBS Source Commit Tag Addition
+    - name: FullCluster
+      struct:
+        - name: clusterType
+          inputType: select
+          choices:
+            - value: tkgm
+              text: TKGm or TKG 2.x with a Management Cluster
+            - value: tkgs
+              text: TKGs or TKG 2.x with a supervisor
+            - value: eks
+              text: EKS
+            - value: tkgi
+              text: TKGi
+            - value: other
+              text: Other
+          required: true
+        - name: clusterName
+          dataType: string
+          label: Cluster Name
+          required: true
+        - name: supplyChain
+          label: Supply Chain
+          inputType: select
+          defaultValue: "testingScanning"
+          choices:
+          - value: basic
+            text: Basic
+          - value: testing
+            text: Testing
+          - value: testing_scanning
+            text: Testing and Scanning
+        - name: deliveryMethod
+          inputType: select
+          choices:
+            - text: RegOps (Imgpkg)
+              value: regOps
+            - text: GitOps Direct Commit
+              value: direct
+            - text: GitOps PR Flow
+              value: pull_request
+          defaultValue: commit
+          label: Deliverable Methodology
+        - name: enableSCG
+          defaultValue: false
+          inputType: checkbox
+          dataType: boolean
+          label: Include Spring Cloud Gateway Installation
+        - name: enableScgPerNamespace
+          defaultValue: false
+          dependsOn: 
+            name: enableSCG
+            value: true
+          inputType: checkbox
+          dataType: boolean
+          label: Create Spring Cloud Gateway Per Namespace
+        - name: enableACS
+          defaultValue: false
+          inputType: checkbox
+          dataType: boolean
+          label: Include Application Configuration Service Installation (Spring Cloud Config Server)
+        - name: enableESO
+          defaultValue: false
+          inputType: checkbox
+          dataType: boolean
+          label: Include External Secrets Operator
+        - name: enableAppSSO
+          defaultValue: false
+          inputType: checkbox
+          dataType: boolean
+          label: Include AppSSO Auth Server Config
+        - name: sourceScanner
+          label: Source Scanner
+          choices:
+            - text: Grype (Default)
+              value: grype
+            - text: Trivy
+              value: trivy
+            - text: Prisma
+              value: prisma
+          defaultValue: grype
+        - name: imageScanner
+          label: Image Scanner
+          choices:
+            - text: Grype (Default)
+              value: grype
+            - text: Trivy
+              value: trivy
+            - text: Prisma
+              value: prisma
+            - text: Carbon Black
+              value: cbc
+            - text: Snyk
+              value: snyk
+          defaultValue: grype
+        - name: enableCosign
+          inputType: checkbox
+          dataType: boolean
+          label: Enable Image Signing With Cosign
+          defaultValue: true
+        - name: authProvider
+          inputType: select
+          choices:
+            - text: "Azure AD"
+              value: azureAD
+            - text: "Okta"
+              value: okta
+            - text: "Github"
+              value: github
+            - text: "Gitlab"
+              value: gitlab
+            - text: "Google"
+              value: google
+            - text: "None"
+              value: none
+          defaultValue: none
+          label: External IDP for TAP GUI
+          required: true
+        - name: guestAuth
+          defaultValue: false
+          inputType: checkbox
+          label: Enable Guest Authentication
+          dataType: boolean
+        - name: customOverlays
+          dataType: Overlays
+          label: Custom Overlays
+
+engine:
+  chain:
+  - merge:
+    - include: [ "**/*" ]
+      exclude: ["README.md","cluster-template.yaml", "values.yaml", "scanner/*", "overlays/*", "additions/*", "readme-snippets/*"]
+    - include: ["cluster-template.yaml"]
+      chain:
+      - type: OpenRewriteRecipe
+        recipe: org.openrewrite.yaml.ChangeValue
+        options:
+          oldKeyPath: '"$.tap_gui.app_config.organization.name"'
+          value: "#artifactId"
+      - type: OpenRewriteRecipe
+        recipe: org.openrewrite.yaml.ChangeValue
+        options:
+          oldKeyPath: '"$.tap_gui.app_config.customize.custom_name"'
+          value: "#artifactId + ' Developer Portal'"
+      - type: OpenRewriteRecipe
+        recipe: org.openrewrite.yaml.ChangeValue
+        options:
+          oldKeyPath: '"$.tap_gui.app_config.app.title"'
+          value: "#artifactId + ' Developer Portal'"
+      - type: OpenRewriteRecipe
+        recipe: org.openrewrite.yaml.ChangeKey
+        options:
+          oldKeyPath: '"$.ootb_supply_chain_basic"'
+          newKey: "'ootb_supply_chain_' + #fullClusterConfig['supplyChain']"
+      - type: OpenRewriteRecipe
+        recipe: org.openrewrite.yaml.ChangeValue
+        options:
+          oldKeyPath: '"$.supply_chain"'
+          value: "#fullClusterConfig['supplyChain']"
+      - type: OpenRewriteRecipe
+        recipe: org.openrewrite.yaml.ChangeValue
+        condition: "#fullClusterConfig['deliveryMethod'] != 'regOps'"
+        options:
+          oldKeyPath: '"$.ootb_supply_chain_basic.gitops.pull_request.server_kind"'
+          value: "#gitType"
+      - type: OpenRewriteRecipe
+        recipe: org.openrewrite.yaml.ChangeValue
+        condition: "#fullClusterConfig['deliveryMethod'] != 'regOps'"
+        options:
+          oldKeyPath: '"$.supply_chain"'
+          value: "#fullClusterConfig['supplyChain']"
+    - include: ["scanner/prisma-creds.yaml","scanner/prisma-pkgr.yaml"]
+      condition: "#fullClusterConfig['sourceScanner'] == 'prisma'" 
+    - include: ["scanner/trivy-pkgr.yaml"]
+      condition: "#fullClusterConfig['sourceScanner'] == 'trivy'" 
+    - include: ["scanner/prisma-creds.yaml","scanner/prisma-pkgr.yaml"]
+      condition: "#fullClusterConfig['imageScanner'] == 'prisma'"
+    - include: ["scanner/trivy-pkgr.yaml"]
+      condition: "#fullClusterConfig['imageScanner'] == 'trivy'" 
+    - include: ["scanner/snyk-creds.yaml"]
+      condition: "#fullClusterConfig['imageScanner'] == 'snyk'"
+    - include: ["scanner/cbc-creds.yaml"]
+      condition: "#fullClusterConfig['imageScanner'] == 'cbc'"
+    - include: ["overlays/contour-ipv4-overlay.yaml"]
+      condition: "#fullClusterConfig['clusterType'] == 'tkgi'"
+    - include: ["overlays/tkgi-prisma-remove-labels-overlay.yaml"]
+      condition: "#fullClusterConfig['clusterType'] == 'tkgi' and #fullClusterConfig['sourceScanner'] == 'prisma'"
+    - include: ["overlays/techdocs-overlay.yaml"]
+      condition: "#fullClusterConfig['customOverlays']['techdocsOverlay']"
+    - include: ["overlays/multi-registry-overlays.yaml"]
+      condition: "#fullClusterConfig['customOverlays']['multiRegistryOverlay']"
+    - include: ["overlays/gitops-private-ca-overlay.yaml"]
+      condition: "#fullClusterConfig['customOverlays']['gitopsPrivateCaOverlay']"
+    - include: ["overlays/source-details-annotations-overlays.yaml"]
+      condition: "#fullClusterConfig['customOverlays']['sourceCommitTracabilityOverlay']"
+    - include: ["overlays/tbs-source-commit-tag-addition-overlay.yaml"]
+      condition: "#fullClusterConfig['customOverlays']['tbsCommitTagOverlay']"
+    - include: ["additions/cosign-setup.yaml"]
+      condition: "#fullClusterConfig['enableCosign']"
+    - include: ["additions/eso-pkgi.yaml"]
+      condition: "#fullClusterConfig['enableESO']"
+    - include: ["additions/scg-pkgi.yaml"]
+      condition: "#fullClusterConfig['enableSCG']"
+    - include: ["additions/acs-pkgi.yaml"]
+      condition: "#fullClusterConfig['enableACS']"
+    - include: ["values.yaml"]
+      chain:
+      - type: OpenRewriteRecipe
+        condition: "#fullClusterConfig['sourceScanner'] != 'prisma' and #fullClusterConfig['imageScanner'] != 'prisma'"
+        recipe: org.openrewrite.yaml.DeleteKey
+        options:
+          keyPath: '"$.security.prisma"'  
+      - type: OpenRewriteRecipe
+        condition: "#fullClusterConfig['imageScanner'] != 'snyk'"
+        recipe: org.openrewrite.yaml.DeleteKey
+        options:
+          keyPath: '"$.security.snyk"'  
+      - type: OpenRewriteRecipe
+        condition: "#fullClusterConfig['imageScanner'] != 'cbc'"
+        recipe: org.openrewrite.yaml.DeleteKey
+        options:
+          keyPath: '"$.security.cbc"'  
+      - type: OpenRewriteRecipe
+        condition: "#fullClusterConfig['authProvider'] != 'github'"
+        recipe: org.openrewrite.yaml.DeleteKey
+        options:
+          keyPath: '"$.tapGui.auth.github"'
+      - type: OpenRewriteRecipe
+        condition: "#fullClusterConfig['authProvider'] != 'okta'"
+        recipe: org.openrewrite.yaml.DeleteKey
+        options:
+          keyPath: '"$.tapGui.auth.okta"'
+      - type: OpenRewriteRecipe
+        condition: "#fullClusterConfig['authProvider'] != 'gitlab'"
+        recipe: org.openrewrite.yaml.DeleteKey
+        options:
+          keyPath: '"$.tapGui.auth.gitlab"'
+      - type: OpenRewriteRecipe
+        condition: "#fullClusterConfig['authProvider'] != 'azureAD'"
+        recipe: org.openrewrite.yaml.DeleteKey
+        options:
+          keyPath: '"$.tapGui.auth.azureAD"'
+      - type: OpenRewriteRecipe
+        condition: "#fullClusterConfig['authProvider'] != 'google'"
+        recipe: org.openrewrite.yaml.DeleteKey
+        options:
+          keyPath: '"$.tapGui.auth.google"'  
+      - type: OpenRewriteRecipe
+        condition: "#fullClusterConfig['authProvider'] != 'none'"
+        recipe: org.openrewrite.yaml.ChangeValue
+        options:
+          oldKeyPath: '"$.tapGui.auth.provider"'
+          value: "#fullClusterConfig['authProvider']"
+      - type: OpenRewriteRecipe
+        recipe: org.openrewrite.yaml.ChangeValue
+        options:
+          oldKeyPath: '"$.security.sourceScanner"'
+          value: "#fullClusterConfig['sourceScanner']"
+      - type: OpenRewriteRecipe
+        recipe: org.openrewrite.yaml.ChangeValue
+        options:
+          oldKeyPath: '"$.security.imageScanner"'
+          value: "#fullClusterConfig['imageScanner']"
+    - include: ["README.md", "readme-snippets/*.md"]
+      chain:
+      - type: RewritePath
+        condition: "#fullClusterConfig['enableCosign']"
+        regex: 'readme-snippets/0-cosign.md'
+        rewriteTo: "'README.md'"
+      - type: RewritePath
+        regex: 'readme-snippets/1-generate-files.md'
+        rewriteTo: "'README.md'"
+      - type: RewritePath
+        regex: 'readme-snippets/2-relocate-images.md'
+        rewriteTo: "'README.md'"
+      - type: RewritePath
+        regex: 'readme-snippets/3-create-prereq-objects.md'
+        rewriteTo: "'README.md'"
+      - type: RewritePath
+        regex: 'readme-snippets/4-install-tap.md'
+        rewriteTo: "'README.md'"
+      - type: RewritePath
+        condition: "#fullClusterConfig['imageScanner'] == 'snyk'"
+        regex: 'readme-snippets/5-snyk.md'
+        rewriteTo: "'README.md'"
+      - type: RewritePath
+        condition: "#fullClusterConfig['imageScanner'] == 'cbc'"
+        regex: 'readme-snippets/5-cbc.md'
+        rewriteTo: "'README.md'"
+      - type: RewritePath
+        condition: "#fullClusterConfig['sourceScanner'] == 'prisma' or #fullClusterConfig['imageScanner'] == 'prisma'"
+        regex: 'readme-snippets/5-prisma.md'
+        rewriteTo: "'README.md'"
+      - type: RewritePath
+        condition: "#fullClusterConfig['sourceScanner'] == 'trivy' or #fullClusterConfig['imageScanner'] == 'trivy'"
+        regex: 'readme-snippets/5-trivy.md'
+        rewriteTo: "'README.md'"
+      - type: RewritePath
+        condition: "#fullClusterConfig['enableESO']"
+        regex: 'readme-snippets/6-eso.md'
+        rewriteTo: "'README.md'"
+      - type: RewritePath
+        condition: "#fullClusterConfig['enableSCG']"
+        regex: 'readme-snippets/7-scg.md'
+        rewriteTo: "'README.md'"
+      - type: RewritePath
+        condition: "#fullClusterConfig['enableACS']"
+        regex: 'readme-snippets/8-acs.md'
+        rewriteTo: "'README.md'"
+      - type: UniquePath
+        strategy: Append
+      
