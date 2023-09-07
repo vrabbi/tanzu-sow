@@ -1,0 +1,30 @@
+accelerator:
+  options:
+    - name: includeTAP
+      inputType: checkbox
+      dataType: boolean
+      required: true
+      defaultValue: false
+      label: Include TAP
+      description: Does the project include TAP Installation
+    - name: topology
+      inputType: select
+      dataType: string
+      choices:
+      - text: "Multi Cluster"
+        value: "multiClusterTap"
+      - text: "Single Cluster"
+        value: "singleClusterTap"
+      label: TAP Topology
+      defaultValue: "multiClusterTap"
+      dependsOn:
+        name: includeTAP
+      required: true
+    - name: airGapped
+      inputType: checkbox
+      dataType: boolean
+      label: Air Gapped Deployment
+      defaultValue: false
+      dependsOn:
+        name: includeTAP
+      required: true

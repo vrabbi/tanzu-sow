@@ -1,0 +1,4 @@
+## Change Management
+We have implemented a robust Change Management process in the Statement of Work (SOW) to ensure a smooth and successful project experience. Customers can submit proposed changes through our formal change request mechanism, which TeraSky’s project manager and the solution architect will thoroughly evaluate. We prioritize transparency and communication throughout the change evaluation, implementation, and documentation phases, keeping customers informed of any impact on resources, budget, and timelines. 
+  
+We aim to maintain an adaptable project plan that aligns with your evolving needs, seamlessly integrating approved changes. Continuous monitoring and learning from implemented changes further enhance our project management process, ensuring exceptional project outcomes.

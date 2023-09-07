@@ -1,0 +1,49 @@
+accelerator:
+  displayName: Tanzu SOW
+  description: Generate an SOW for a Tanzu Project
+  tags:
+  - tap
+  - tkg
+  - tmc
+  - to
+  - tsm
+  - tanzu
+  - sow
+
+  imports:
+  - name: generic-sow-start
+  - name: generic-sow-end
+  - name: tkg
+  - name: tap
+  - name: tmc
+  - name: to
+  - name: tsm
+engine: 
+  chain:
+    - include: ["**/**"]
+      chain:
+        - type: InvokeFragment
+          reference: generic-sow-start
+        - type: InvokeFragment
+          reference: tkg
+          condition: "#includeTKG"
+        - type: InvokeFragment
+          reference: tmc
+          condition: "#includeTMC"
+        - type: InvokeFragment
+          reference: tap
+          condition: "#includeTAP"
+        - type: InvokeFragment
+          reference: to
+          condition: "#includeTO"
+        - type: InvokeFragment
+          reference: tsm
+          condition: "#includeTSM"
+        - type: InvokeFragment
+          reference: generic-sow-end
+        - type: UniquePath
+          strategy: Append
+
+        
+            
+          

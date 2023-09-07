@@ -1,0 +1,33 @@
+accelerator:
+  options:
+    - name: includeTKG
+      inputType: checkbox
+      dataType: boolean
+      required: true
+      defaultValue: false
+      label: Include TKG
+      description: Does the project include TKG Installation
+    - name: airGapped
+      inputType: checkbox
+      dataType: boolean
+      label: Air Gapped Deployment
+      defaultValue: false
+      dependsOn:
+        name: includeTKG
+      required: true
+    - name: harbor
+      inputType: checkbox
+      dataType: boolean
+      label: Include Harbor Deployment
+      defaultValue: true
+      dependsOn:
+        name: includeTKG
+      required: true
+    - name: monitoring
+      inputType: checkbox
+      dataType: boolean
+      label: Include Monitoring Stack Deployment
+      defaultValue: true
+      dependsOn:
+        name: includeTKG
+      required: true

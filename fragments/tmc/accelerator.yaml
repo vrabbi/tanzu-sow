@@ -1,0 +1,22 @@
+accelerator:
+  options:
+    - name: includeTMC
+      inputType: checkbox
+      dataType: boolean
+      required: true
+      defaultValue: false
+      label: Include Tanzu Mission Control
+      description: Does the project include TMC Installation
+    - name: deploymentType
+      inputType: select
+      dataType: string
+      choices:
+      - text: "SaaS"
+        value: "saas"
+      - text: "Self Managed"
+        value: "selfManaged"
+      label: TMC Deployment Type
+      defaultValue: "selfManaged"
+      dependsOn:
+        name: includeTMC
+      required: true

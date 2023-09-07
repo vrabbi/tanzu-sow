@@ -1,0 +1,41 @@
+accelerator:
+  options:
+  - name: customerName
+    inputType: text
+    dataType: string
+    required: true
+    label: Customer Name
+  - name: customerLogoUrl
+    inputType: text
+    dataType: string
+    required: true
+    label: Customer Logo URL
+engine: 
+  chain:
+  - include:
+      - "README.md"
+      - "snippets/*.md"
+    chain:
+      - type: ReplaceText
+        substitutions:
+          - text: "CUSTOMER_LOGO_URL_PLACEHOLDER"
+            with: "#customerLogoUrl"
+      - type: ReplaceText
+        substitutions:
+          - text: "CUSTOMER_NAME_PLACEHOLDER"
+            with: "#customerName"
+      - type: RewritePath
+        regex: 'snippets/title.md'
+        rewriteTo: "'README.md'"
+      - type: RewritePath
+        regex: 'snippets/about.md'
+        rewriteTo: "'README.md'"
+      - type: RewritePath
+        regex: 'snippets/executive-summary.md'
+        rewriteTo: "'README.md'"
+      - type: RewritePath
+        regex: 'snippets/customer-challenges.md'
+        rewriteTo: "'README.md'"
+      - type: UniquePath
+        strategy: Append
+      

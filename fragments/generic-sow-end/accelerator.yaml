@@ -1,0 +1,31 @@
+accelerator:
+  options:
+  - name: customerName
+    inputType: text
+    dataType: string
+    required: true
+    label: Customer Name
+engine: 
+  chain:
+  - include:
+      - "README.md"
+      - "snippets/*.md"
+    chain:
+      - type: ReplaceText
+        substitutions:
+          - text: "CUSTOMER_NAME_PLACEHOLDER"
+            with: "#customerName"
+      - type: RewritePath
+        regex: 'snippets/knowledge-transfer.md'
+        rewriteTo: "'README.md'"
+      - type: RewritePath
+        regex: 'snippets/change-mgmt.md'
+        rewriteTo: "'README.md'"
+      - type: RewritePath
+        regex: 'snippets/terms-and-conditions.md'
+        rewriteTo: "'README.md'"
+      - type: RewritePath
+        regex: 'snippets/pricing.md'
+        rewriteTo: "'README.md'"
+      - type: UniquePath
+        strategy: Append

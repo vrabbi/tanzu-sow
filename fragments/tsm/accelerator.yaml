@@ -1,0 +1,8 @@
+accelerator:
+  options:
+    - name: includeTSM
+      inputType: checkbox
+      dataType: boolean
+      required: true
+      defaultValue: false
+      label: Include Tanzu Service Mesh

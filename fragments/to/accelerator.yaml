@@ -1,0 +1,8 @@
+accelerator:
+  options:
+    - name: includeTO
+      inputType: checkbox
+      dataType: boolean
+      required: true
+      defaultValue: false
+      label: Include Tanzu Observability
